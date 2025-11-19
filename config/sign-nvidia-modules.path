@@ -1,0 +1,23 @@
+[Unit]
+Description=Watch NVIDIA Module Directory for Changes
+Documentation=https://github.com/your-username/mok
+Requires=sign-nvidia-modules.service
+
+[Path]
+# Watch for new or modified NVIDIA kernel modules
+PathModified=/usr/lib/modules/%v/extra
+
+# Monitor NVIDIA-specific files
+PathChanges=/usr/lib/modules/%v/extra
+PathChanges=/usr/lib/modules/%v/extra/nvidia/nvidia.ko
+PathChanges=/usr/lib/modules/%v/extra/nvidia-drm/nvidia-drm.ko
+PathChanges=/usr/lib/modules/%v/extra/nvidia-uvm/nvidia-uvm.ko
+
+# Trigger service on path change
+Unit=sign-nvidia-modules.service
+
+# Debounce to prevent rapid repeated triggers (10 seconds)
+MakeDirectory=yes
+
+[Install]
+WantedBy=multi-user.target

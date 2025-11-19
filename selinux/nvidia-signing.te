@@ -1,0 +1,114 @@
+policy_module(nvidia_signing, 1.0.0)
+
+########################################
+# NVIDIA Signing Domain
+########################################
+
+type nvidia_signing_t;
+type nvidia_signing_exec_t;
+
+# Allow init scripts and systemd to execute the domain
+init_daemon_domain(nvidia_signing_t, nvidia_signing_exec_t)
+
+# Allow execution in unconfined domain during boot (systemd)
+domain_auto_trans(unconfined_domain_type, nvidia_signing_exec_t, nvidia_signing_t)
+
+########################################
+# File access
+########################################
+
+type nvidia_signing_var_lib_t;
+files_type(nvidia_signing_var_lib_t)
+
+type nvidia_signing_var_log_t;
+logging_log_file(nvidia_signing_var_log_t)
+
+type nvidia_signing_lock_t;
+files_lock_file(nvidia_signing_lock_t)
+
+# Read kernel module files
+fs_read_sysfs(nvidia_signing_t)
+fs_read_debugfs(nvidia_signing_t)
+fs_read_tmpfs(nvidia_signing_t)
+
+# Read/write module directories
+fs_manage_sysfs_files(nvidia_signing_t)
+kernel_read_system_symbols(nvidia_signing_t)
+kernel_read_kernel_modules(nvidia_signing_t)
+kernel_manage_kernel_modules(nvidia_signing_t)
+
+# Read/write /usr/lib/modules
+files_read_kernel_modules(nvidia_signing_t)
+files_manage_kernel_modules(nvidia_signing_t)
+
+# Access to kernel source
+files_read_kernel_src(nvidia_signing_t)
+
+# Access to keys directory
+miscfiles_read_etc_files(nvidia_signing_t)
+
+########################################
+# Process permissions
+########################################
+
+# Allow running as root
+allow nvidia_signing_t self:capability { chown dac_override setfcap sys_admin sys_nice sys_ptrace };
+allow nvidia_signing_t self:capability2 { block_suspend syslog wake_alarm };
+allow nvidia_signing_t self:process { fork signal_perms setcap setpgid setsched };
+
+########################################
+# Device access
+########################################
+
+# TPM2 device access
+dev_rw_tpm(nvidia_signing_t)
+
+# /sys/firmware/efi access for Secure Boot status
+fs_read_efivarfs(nvidia_signing_t)
+
+########################################
+# Logging and state management
+########################################
+
+# Create and write to /var/lib/nvidia-signing
+allow nvidia_signing_t nvidia_signing_var_lib_t:dir { create_dir_perms };
+allow nvidia_signing_t nvidia_signing_var_lib_t:file { create_file_perms write };
+
+# Create and write to /var/log/nvidia-signing
+allow nvidia_signing_t nvidia_signing_var_log_t:dir { create_dir_perms };
+allow nvidia_signing_t nvidia_signing_var_log_t:file { create_file_perms append write };
+logging_send_syslog_msg(nvidia_signing_t)
+
+# Lock file management
+allow nvidia_signing_t nvidia_signing_lock_t:file { create_file_perms write };
+allow nvidia_signing_t nvidia_signing_lock_t:dir { create_dir_perms };
+
+########################################
+# Tool execution
+########################################
+
+# Execute dracut
+corecmd_exec_bin(nvidia_signing_t)
+
+# Execute modinfo, mokutil, tpm2 tools
+allow nvidia_signing_t self:process { setcap };
+
+########################################
+# Network (for TPM2 operations if needed)
+########################################
+
+corenet_all_recvfrom_netlabel(nvidia_signing_t)
+corenet_all_recvfrom_loopback(nvidia_signing_t)
+
+########################################
+# File transitions
+########################################
+
+# Automatically transition module files to proper type
+filetrans_pattern(nvidia_signing_t, bin_t, nvidia_signing_exec_t, file)
+
+# Transition log files
+filetrans_pattern(nvidia_signing_t, var_log_t, nvidia_signing_var_log_t, file)
+
+# Transition state files
+filetrans_pattern(nvidia_signing_t, var_lib_t, nvidia_signing_var_lib_t, file)

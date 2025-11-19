@@ -1,0 +1,29 @@
+[Unit]
+Description=NVIDIA Signing System Slice
+Documentation=https://github.com/your-username/mok
+Before=slice.target
+Wants=system.slice
+
+[Slice]
+# CPU resource limits
+CPUQuota=50%
+CPUAccounting=yes
+
+# Memory limits
+MemoryLimit=1G
+MemoryAccounting=yes
+MemoryMax=1.2G
+
+# I/O limits
+IOAccounting=yes
+IOWeight=100
+
+# Task limits
+TasksMax=100
+TasksAccounting=yes
+
+# Block I/O limits
+BlockIOAccounting=yes
+
+[Install]
+WantedBy=multi-user.target

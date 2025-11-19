@@ -1,0 +1,25 @@
+[Unit]
+Description=Sign NVIDIA Kernel Modules Socket Activation
+Documentation=https://github.com/your-username/mok
+Before=sign-nvidia-modules.service
+Requires=sign-nvidia-modules.service
+
+[Socket]
+# Create socket in /run
+RuntimeDirectory=nvidia-signing
+RuntimeDirectoryMode=0755
+
+# Abstract socket for privileged communication
+ListenStream=@nvidia-signing
+
+# Accept at most 10 pending connections
+MaxConnections=10
+
+# Timeout for accepting connections
+Accept=no
+
+# Pass socket to service
+Service=sign-nvidia-modules.service
+
+[Install]
+WantedBy=sockets.target

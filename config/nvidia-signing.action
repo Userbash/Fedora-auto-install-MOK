@@ -1,0 +1,16 @@
+# DNF Post-Transaction Hook for NVIDIA Module Signing
+# This hook triggers automatic signing of NVIDIA modules after kernel/driver updates
+#
+# Place this file in: /etc/dnf/plugins/post-transaction-actions.d/nvidia-signing.action
+#
+# Format:
+# <transaction-command> [<package-name-glob>]
+# <command-to-execute>
+#
+# References:
+# - https://dnf.readthedocs.io/en/latest/conf_ref.html
+# - https://dnf-plugins-core.readthedocs.io/en/latest/post-transaction-actions.html
+
+# Trigger on NVIDIA driver package updates
+any(akmod-nvidia*, xorg-x11-drv-nvidia*, kernel*)
+/usr/local/bin/sign-nvidia-modules.sh

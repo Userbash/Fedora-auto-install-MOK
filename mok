@@ -1,0 +1,390 @@
+#!/bin/bash
+
+################################################################################
+# MOK - NVIDIA Module Auto-Signing System
+# Unified Launch Script with Modular Architecture
+# Fedora 43 with Secure Boot and TPM2 Support
+#
+# Purpose: Central entry point for all NVIDIA module signing operations
+# Features:
+#   - Modular command structure
+#   - Consistent logging and error handling
+#   - Environment detection and validation
+#   - Comprehensive help and documentation
+################################################################################
+
+set -euo pipefail
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Script metadata
+readonly MOK_VERSION="1.0.0"
+readonly SCRIPT_NAME="mok"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Module paths
+readonly BIN_DIR="${SCRIPT_DIR}/bin"
+readonly CONFIG_DIR="${SCRIPT_DIR}/config"
+readonly DOCS_DIR="${SCRIPT_DIR}/docs"
+readonly SELINUX_DIR="${SCRIPT_DIR}/selinux"
+readonly TESTS_DIR="${SCRIPT_DIR}/tests"
+
+# Installation paths
+readonly INSTALL_BIN_DIR="/usr/local/bin"
+readonly INSTALL_CONFIG_DIR="/etc/nvidia-signing"
+readonly INSTALL_SYSTEMD_DIR="/etc/systemd/system"
+readonly INSTALL_DNF_DIR="/etc/dnf/plugins/post-transaction-actions.d"
+readonly INSTALL_SELINUX_DIR="/usr/share/selinux/packages"
+
+################################################################################
+# Logging and Output Functions
+################################################################################
+
+log() {
+    local level="$1"
+    shift
+    local message="$@"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[${timestamp}] [${level}] ${message}"
+}
+
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $@"
+}
+
+log_success() {
+    echo -e "${GREEN}[✓]${NC} $@"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[!]${NC} $@"
+}
+
+log_error() {
+    echo -e "${RED}[✗]${NC} $@" >&2
+}
+
+log_debug() {
+    if [[ "${DEBUG:-0}" == "1" ]]; then
+        echo -e "${CYAN}[DEBUG]${NC} $@"
+    fi
+}
+
+print_banner() {
+    echo -e "${MAGENTA}"
+    echo "╔════════════════════════════════════════════════════════════╗"
+    echo "║  MOK - NVIDIA Module Auto-Signing System v${MOK_VERSION}     ║"
+    echo "║  Fedora 43 with Secure Boot and TPM2 Support             ║"
+    echo "╚════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+################################################################################
+# Module Import and Validation
+################################################################################
+
+validate_environment() {
+    log_debug "Validating environment..."
+
+    # Check if running in correct directory
+    if [[ ! -d "${BIN_DIR}" ]] || [[ ! -d "${CONFIG_DIR}" ]]; then
+        log_error "Invalid environment: Required directories not found"
+        log_error "Ensure you're running this script from the MOK project root"
+        return 1
+    fi
+
+    log_debug "Environment validation passed"
+    return 0
+}
+
+check_root() {
+    if [[ "${EUID:-1}" -ne 0 ]] && [[ "$1" != "help" ]] && [[ "$1" != "version" ]] && [[ "$1" != "docs" ]]; then
+        log_error "This operation requires root privileges"
+        log_info "Try: sudo ${SCRIPT_NAME} $@"
+        return 1
+    fi
+}
+
+################################################################################
+# Command Handlers
+################################################################################
+
+cmd_sign() {
+    log_info "Starting NVIDIA module signing process..."
+    log_debug "Executing: ${BIN_DIR}/sign-nvidia-modules.sh"
+
+    "${BIN_DIR}/sign-nvidia-modules.sh" "$@"
+}
+
+cmd_test() {
+    log_info "Running comprehensive test suite..."
+    log_debug "Executing: ${BIN_DIR}/test-nvidia-signing.sh"
+
+    "${BIN_DIR}/test-nvidia-signing.sh" "$@"
+}
+
+cmd_install() {
+    log_info "Installing NVIDIA signing system..."
+    log_debug "Executing: ${BIN_DIR}/install-nvidia-signing.sh"
+
+    "${BIN_DIR}/install-nvidia-signing.sh" "$@"
+}
+
+cmd_rollback() {
+    log_warning "Initiating rollback procedure..."
+    log_debug "Executing: ${BIN_DIR}/rollback-nvidia-signing.sh"
+
+    "${BIN_DIR}/rollback-nvidia-signing.sh" "$@"
+}
+
+cmd_status() {
+    log_info "Checking system status..."
+
+    local status_ok=true
+
+    echo ""
+    echo -e "${CYAN}=== System Information ===${NC}"
+    echo "Kernel: $(uname -r)"
+    echo "Fedora: $(grep VERSION_ID /etc/os-release | cut -d= -f2 | tr -d '"')"
+    echo ""
+
+    echo -e "${CYAN}=== Secure Boot Status ===${NC}"
+    if command -v mokutil &>/dev/null; then
+        if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
+            echo -e "${GREEN}[✓]${NC} Secure Boot: Enabled"
+        else
+            echo -e "${YELLOW}[!]${NC} Secure Boot: Disabled"
+        fi
+    else
+        echo -e "${YELLOW}[!]${NC} mokutil not found - cannot determine Secure Boot status"
+    fi
+    echo ""
+
+    echo -e "${CYAN}=== TPM2 Status ===${NC}"
+    if command -v tpm2_getcap &>/dev/null; then
+        if tpm2_getcap handles-persistent 2>/dev/null >/dev/null; then
+            echo -e "${GREEN}[✓]${NC} TPM2: Available"
+        else
+            echo -e "${YELLOW}[!]${NC} TPM2: Tools installed but no chip detected"
+        fi
+    else
+        echo -e "${YELLOW}[!]${NC} TPM2: Tools not installed"
+    fi
+    echo ""
+
+    echo -e "${CYAN}=== Installation Status ===${NC}"
+    if [[ -f "${INSTALL_BIN_DIR}/sign-nvidia-modules.sh" ]]; then
+        echo -e "${GREEN}[✓]${NC} Scripts installed"
+    else
+        echo -e "${RED}[✗]${NC} Scripts not installed"
+        status_ok=false
+    fi
+
+    if [[ -f "${INSTALL_SYSTEMD_DIR}/sign-nvidia.service" ]]; then
+        echo -e "${GREEN}[✓]${NC} Systemd service installed"
+    else
+        echo -e "${RED}[✗]${NC} Systemd service not installed"
+        status_ok=false
+    fi
+
+    if [[ -f "/var/lib/nvidia-signing/state.json" ]]; then
+        echo -e "${GREEN}[✓]${NC} State file found"
+        echo "  Last execution:"
+        cat /var/lib/nvidia-signing/state.json | grep -E 'timestamp|modules_signed' | head -2 | sed 's/^/    /'
+    else
+        echo -e "${YELLOW}[!]${NC} State file not found (system not yet run)"
+    fi
+    echo ""
+
+    if [[ "${status_ok}" == "true" ]]; then
+        log_success "System appears healthy"
+        return 0
+    else
+        log_warning "Some components are not installed. Run '${SCRIPT_NAME} install' to complete setup."
+        return 1
+    fi
+}
+
+cmd_logs() {
+    log_info "Recent log entries..."
+
+    if [[ -d "/var/log/nvidia-signing" ]]; then
+        local latest_log=$(ls -t /var/log/nvidia-signing/*.log 2>/dev/null | head -1)
+        if [[ -n "${latest_log}" ]]; then
+            echo ""
+            echo -e "${CYAN}Latest log: ${latest_log}${NC}"
+            echo ""
+            tail -n 30 "${latest_log}"
+        else
+            log_warning "No log files found"
+        fi
+    else
+        log_warning "Log directory not found. Have you run the signing script yet?"
+    fi
+}
+
+cmd_docs() {
+    local page="$1"
+
+    if [[ -z "${page}" ]]; then
+        echo ""
+        echo -e "${CYAN}=== MOK Documentation ===${NC}"
+        echo ""
+        ls -1 "${DOCS_DIR}"/*.md | while read doc; do
+            basename "${doc}"
+        done
+        echo ""
+        echo "Usage: ${SCRIPT_NAME} docs <page>"
+        echo "Example: ${SCRIPT_NAME} docs README"
+        return 0
+    fi
+
+    local doc_file="${DOCS_DIR}/${page}.md"
+
+    if [[ -f "${doc_file}" ]]; then
+        if command -v less &>/dev/null; then
+            less "${doc_file}"
+        else
+            cat "${doc_file}"
+        fi
+    else
+        log_error "Documentation file not found: ${page}"
+        log_info "Available pages:"
+        ls -1 "${DOCS_DIR}"/*.md | xargs -n1 basename | sed 's/\.md$//' | sed 's/^/  - /'
+        return 1
+    fi
+}
+
+cmd_version() {
+    echo "${MOK_VERSION}"
+}
+
+cmd_help() {
+    print_banner
+    echo ""
+    echo -e "${CYAN}USAGE${NC}"
+    echo "  ${SCRIPT_NAME} <command> [options]"
+    echo ""
+    echo -e "${CYAN}COMMANDS${NC}"
+    echo ""
+    echo -e "${GREEN}sign${NC}             Sign NVIDIA kernel modules"
+    echo "                  Options:"
+    echo "                    DEBUG=1      Enable debug output"
+    echo ""
+    echo -e "${GREEN}test${NC}             Run comprehensive test suite"
+    echo ""
+    echo -e "${GREEN}install${NC}          Install system components (requires root)"
+    echo ""
+    echo -e "${GREEN}rollback${NC}         Rollback to previous module state (requires root)"
+    echo ""
+    echo -e "${GREEN}status${NC}           Display system status and health check"
+    echo ""
+    echo -e "${GREEN}logs${NC}             Show recent execution logs"
+    echo ""
+    echo -e "${GREEN}docs${NC} [page]      Display documentation"
+    echo "                  Example: ${SCRIPT_NAME} docs README"
+    echo "                  Example: ${SCRIPT_NAME} docs QUICKSTART"
+    echo ""
+    echo -e "${GREEN}version${NC}          Display version information"
+    echo ""
+    echo -e "${GREEN}help${NC}             Display this help message"
+    echo ""
+    echo -e "${CYAN}EXAMPLES${NC}"
+    echo ""
+    echo "  # Check system status before signing"
+    echo "  ${SCRIPT_NAME} status"
+    echo ""
+    echo "  # Install the system"
+    echo "  sudo ${SCRIPT_NAME} install"
+    echo ""
+    echo "  # Sign modules manually"
+    echo "  sudo ${SCRIPT_NAME} sign"
+    echo ""
+    echo "  # Run tests with debug output"
+    echo "  sudo DEBUG=1 ${SCRIPT_NAME} test"
+    echo ""
+    echo "  # View last logs"
+    echo "  ${SCRIPT_NAME} logs"
+    echo ""
+    echo "  # Read documentation"
+    echo "  ${SCRIPT_NAME} docs QUICKSTART"
+    echo ""
+    echo -e "${CYAN}QUICK REFERENCE${NC}"
+    echo ""
+    echo "  Installation:     sudo ${SCRIPT_NAME} install"
+    echo "  Manual sign:      sudo ${SCRIPT_NAME} sign"
+    echo "  Verify setup:     ${SCRIPT_NAME} test"
+    echo "  Check status:     ${SCRIPT_NAME} status"
+    echo "  View logs:        ${SCRIPT_NAME} logs"
+    echo "  Emergency rollback: sudo ${SCRIPT_NAME} rollback"
+    echo ""
+    echo -e "${CYAN}DOCUMENTATION${NC}"
+    echo ""
+    echo "  For detailed information, see:"
+    echo "    ${SCRIPT_NAME} docs README           (Full documentation)"
+    echo "    ${SCRIPT_NAME} docs QUICKSTART       (Quick setup guide)"
+    echo "    ${SCRIPT_NAME} docs DEPLOYMENT_CHECKLIST (Deployment steps)"
+    echo ""
+}
+
+################################################################################
+# Main Entry Point
+################################################################################
+
+main() {
+    validate_environment || exit 1
+
+    local command="${1:-help}"
+    shift || true
+
+    case "${command}" in
+        sign)
+            check_root "${command}" || exit 1
+            cmd_sign "$@"
+            ;;
+        test)
+            check_root "${command}" || exit 1
+            cmd_test "$@"
+            ;;
+        install)
+            check_root "${command}" || exit 1
+            cmd_install "$@"
+            ;;
+        rollback)
+            check_root "${command}" || exit 1
+            cmd_rollback "$@"
+            ;;
+        status)
+            cmd_status "$@"
+            ;;
+        logs)
+            cmd_logs "$@"
+            ;;
+        docs)
+            cmd_docs "$@"
+            ;;
+        version)
+            cmd_version
+            ;;
+        help|--help|-h)
+            cmd_help
+            ;;
+        *)
+            log_error "Unknown command: ${command}"
+            echo ""
+            echo "Run '${SCRIPT_NAME} help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function
+main "$@"
+exit $?

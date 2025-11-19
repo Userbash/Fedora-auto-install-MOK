@@ -1,0 +1,11 @@
+[Unit]
+Description=NVIDIA Kernel Module Signing Target
+Documentation=https://github.com/your-username/mok
+Requires=sign-nvidia-modules.service
+After=sign-nvidia-modules.service
+
+# Slice for resource control
+Slice=system-nvidia-signing.slice
+
+[Install]
+WantedBy=multi-user.target

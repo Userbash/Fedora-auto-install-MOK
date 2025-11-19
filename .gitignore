@@ -1,0 +1,50 @@
+# System files
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+*.lock
+
+# State and runtime files
+/var/
+*.pid
+*.sock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.code-workspace
+.vim/
+
+# Build artifacts (if any future compilation)
+*.o
+*.a
+*.so
+
+# Backup files
+*.bak
+*.orig
+
+# Python cache (if any Python utilities added)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node modules (if any JavaScript added)
+node_modules/
+
+# Distribution packages
+*.tar.gz
+*.zip
+*.rpm
+*.deb
+
+# Generated documentation
+*.html
+site/

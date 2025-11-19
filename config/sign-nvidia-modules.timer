@@ -1,0 +1,21 @@
+[Unit]
+Description=Sign NVIDIA Kernel Modules Timer (Periodic Verification)
+Documentation=https://github.com/your-username/mok
+Requires=sign-nvidia-modules.service
+
+[Timer]
+# Run every 6 hours
+OnBootSec=5min
+OnUnitActiveSec=6h
+
+# Randomize start time to prevent thundering herd (±15 minutes)
+RandomizedDelaySec=15min
+
+# Accuracy level
+AccuracySec=1min
+
+# Trigger even if system was powered off during scheduled time
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

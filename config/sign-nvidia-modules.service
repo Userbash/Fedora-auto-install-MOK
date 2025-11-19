@@ -1,0 +1,80 @@
+[Unit]
+Description=Sign NVIDIA Kernel Modules
+Documentation=https://github.com/your-username/mok
+After=dracut-pre-build.service network-online.target local-fs.target
+Before=getty@tty1.service
+Wants=network-online.target
+
+# Only run if NVIDIA modules exist
+ConditionPathExists=/usr/lib/modules/%v/extra/*nvidia*.ko
+ConditionVirtualization=!container
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/systemctl is-system-running --quiet || true
+ExecStartPre=-/usr/local/lib/nvidia-signing/pre-sign-check.sh
+ExecStart=/usr/local/bin/sign-nvidia-modules.sh
+ExecStartPost=/usr/local/lib/nvidia-signing/post-sign-verify.sh
+ExecStartPost=/usr/bin/systemctl set-environment NVIDIA_SIGNING_STATE=success
+
+# Restart on transient failures (connection issues, lock timeouts)
+Restart=on-failure
+RestartSec=30s
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+# Timeout
+TimeoutStartSec=5min
+
+# Process isolation and security
+User=root
+Group=root
+
+# Capabilities: Allow module signing and DAC override
+CapabilityBoundingSet=CAP_SYS_MODULE CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_ADMIN
+AmbientCapabilities=CAP_SYS_MODULE CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH
+
+# Filesystem protection
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=no
+ProtectControlGroups=yes
+ReadWritePaths=/usr/lib/modules /etc/pki/akmods/certs /var/lib/nvidia-signing /var/log/nvidia-signing /boot
+ProtectClock=yes
+ProtectHostname=yes
+PrivateDevices=no
+PrivateTmp=yes
+
+# Additional isolation
+NoNewPrivileges=false
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+# Resource limits
+MemoryLimit=512M
+MemoryAccounting=yes
+TasksMax=100
+
+# Logging and debugging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nvidia-signing
+SyslogFacility=daemon
+SyslogLevel=notice
+
+# State tracking
+RemainAfterExit=yes
+
+# Dependencies on other services/targets
+Requires=nvidia-signing.target
+
+# Start as root, drop privileges after keyring operations if needed
+PrivilegesSeparation=no
+
+[Install]
+WantedBy=multi-user.target
